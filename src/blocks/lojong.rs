@@ -112,8 +112,14 @@ mod tests {
     #[test]
     fn same_seed_same_slogan_and_daily_is_stable() {
         let p = |doc: Doc| doc.preview(false);
-        assert_eq!(p(build(day(), None, false, Some(7), true).unwrap()), p(build(day(), None, false, Some(7), true).unwrap()));
-        assert_eq!(p(build(day(), None, true, None, true).unwrap()), p(build(day(), None, true, Some(1), true).unwrap()));
+        assert_eq!(
+            p(build(day(), None, false, Some(7), true).unwrap()),
+            p(build(day(), None, false, Some(7), true).unwrap())
+        );
+        assert_eq!(
+            p(build(day(), None, true, None, true).unwrap()),
+            p(build(day(), None, true, Some(1), true).unwrap())
+        );
     }
 
     #[test]
