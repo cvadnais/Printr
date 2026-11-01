@@ -218,6 +218,11 @@ fn write_device_within(path: &Path, bytes: &[u8], timeout: Duration) -> Result<(
     }
 }
 
+/// Densité réglée par `PRINTR_DENSITY`, de 0 à 31.
+fn density() -> Option<u8> {
+    std::env::var("PRINTR_DENSITY").ok()?.trim().parse().ok().filter(|n| *n <= 31)
+}
+
 /// Octets ESC/POS d'un ticket, fabriqués en mémoire.
 pub fn render(doc: &Doc, cut: bool) -> Result<Vec<u8>> {
     let buffer = Rc::new(RefCell::new(Vec::new()));
@@ -225,9 +230,14 @@ pub fn render(doc: &Doc, cut: bool) -> Result<Vec<u8>> {
     // PC858 = Europe de l'Ouest avec le symbole € ; le texte est encodé par `cp858`. PC850 (sans €)
     // pour les imprimantes qui n'ont pas la page 19 (`PRINTR_CODEPAGE=850`).
     let page = if crate::cp858::is_pc850() { PageCode::PC850 } else { PageCode::PC858 };
-    let options = PrinterOptions::new(Some(page), None, 42);
+    let options = PrinterOptions::new(Some(page), None, crate::doc::columns_a() as u8);
     let mut printer = Printer::new(driver, Protocol::default(), Some(options));
     printer.init()?.page_code(page)?;
+    // `DC2 # n` : densité d'impression des imprimantes compatibles (Rongta, Xprinter…), si
+    // `PRINTR_DENSITY` (0 à 31) est réglé. Ignoré par les Epson ; à renvoyer après chaque `ESC @`.
+    if let Some(n) = density() {
+        printer.custom(&[0x12, b'#', n])?;
+    }
     doc.render(&mut printer)?;
     // Un ticket qui finit par un bloc coupe est déjà coupé.
     if cut && !doc.ends_with_cut() {
