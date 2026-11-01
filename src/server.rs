@@ -247,7 +247,7 @@ impl App {
             "queued": store.data.queue.len(),
             "paper": paper_json(&store.data.paper),
             "last_ticket": last,
-            "version": env!("CARGO_PKG_VERSION"),
+            "version": crate::VERSION,
         })
     }
 
@@ -1303,7 +1303,7 @@ fn handle(app: &App, request: &mut Request) -> Reply {
                 "hidden_blocks": hidden_blocks,
                 "claude": claude.as_ref().map(|c| c.model().to_owned()),
                 "claude_backend": claude.as_ref().map(|c| c.backend()),
-                "version": env!("CARGO_PKG_VERSION"),
+                "version": crate::VERSION,
                 "mqtt_prefix": crate::mqtt::prefix(),
                 "update": *app.latest.lock().unwrap_or_else(|e| e.into_inner()),
                 // Installation automatique active (avec clé de signature), et la dernière faite.

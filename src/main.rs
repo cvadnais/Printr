@@ -48,6 +48,9 @@ const STYLES: Styles = Styles::styled()
 /// Nom de la version mineure en cours : un pionnier de l'imprimerie, par ordre alphabétique (voir
 /// le CHANGELOG). À changer à chaque nouvelle version mineure, en même temps que le CHANGELOG.
 const CODENAME: &str = "Mergenthaler";
+/// Displayed version: upstream version plus a suffix marking CV's fork. Display only: the updater
+/// still compares the plain CARGO_PKG_VERSION.
+pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-cv");
 
 /// Imprime des tickets sur une Epson TM-T88V (ESC/POS).
 #[derive(Parser)]
@@ -250,7 +253,7 @@ fn parse_cli() -> Cli {
         })
     };
     // « printr 1.6.0 “Gutenberg” » ; une seule chaîne, construite une fois.
-    let version: &'static str = Box::leak(format!("{} “{CODENAME}”", env!("CARGO_PKG_VERSION")).into_boxed_str());
+    let version: &'static str = Box::leak(format!("{VERSION} “{CODENAME}”").into_boxed_str());
     let mut command = headings(Cli::command().version(version)).mut_subcommands(headings);
     if i18n::en() {
         command = in_english(command);
