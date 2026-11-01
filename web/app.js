@@ -1273,7 +1273,7 @@ function Paper({ preview, loading }) {
     return html`<div class="paper-wrap"><div class="paper ${loading ? 'loading' : ''}"><div class="paper-empty">
       ${loading ? html`<${Spinner} />` : T('Ajoute des blocs pour voir ton ticket ici.', 'Add blocks to see your ticket here.')}</div></div></div>`;
   }
-  return html`<div class="paper-wrap"><div class="paper ${loading ? 'loading' : ''}">
+  return html`<div class="paper-wrap"><div class="paper ${loading ? 'loading' : ''}" style=${preview.columns ? { '--cols': preview.columns } : null}>
     ${preview.ops.length === 0 && html`<div class="paper-empty">${T('Ton ticket est vide.', 'Your ticket is empty.')}</div>`}
     ${preview.ops.map((op, i) => {
       if (op.t === 'cut') return html`<div class="cut" key=${i} role="separator" aria-label=${T('Coupe', 'Cut')}><${Icon} name="scissors" /></div>`;

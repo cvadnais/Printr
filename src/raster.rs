@@ -1,5 +1,6 @@
 use std::io::Cursor;
 use std::path::Path;
+use std::sync::OnceLock;
 
 use anyhow::{Context, Result};
 use escpos::driver::Driver;
@@ -11,6 +12,31 @@ use serde::{Deserialize, Serialize};
 
 /// Largeur imprimable de la TM-T88V sur papier 80 mm, en points.
 pub const PRINT_WIDTH: u32 = 512;
+
+/// Largeur imprimable réelle, en points : `PRINT_WIDTH` par défaut (TM-T88V, 180 ppp), ou
+/// `PRINTR_PAPER_DOTS` pour une autre imprimante 80 mm (576 pour une 203 ppp à 48 colonnes).
+/// Les dessins des blocs restent à `PRINT_WIDTH` et sont centrés sur cette largeur.
+pub fn paper_dots() -> u32 {
+    static DOTS: OnceLock<u32> = OnceLock::new();
+    *DOTS.get_or_init(|| {
+        std::env::var("PRINTR_PAPER_DOTS")
+            .ok()
+            .and_then(|v| v.trim().parse().ok())
+            .filter(|d| (384..=832).contains(d) && d % 8 == 0)
+            .unwrap_or(PRINT_WIDTH)
+    })
+}
+
+/// L'image centrée sur toute la largeur du papier, si elle est plus étroite.
+pub fn fit_paper(gray: &GrayImage) -> std::borrow::Cow<'_, GrayImage> {
+    let paper = paper_dots();
+    if gray.width() >= paper {
+        return std::borrow::Cow::Borrowed(gray);
+    }
+    let mut out = GrayImage::from_pixel(paper, gray.height(), Luma([255]));
+    imageops::replace(&mut out, gray, i64::from((paper - gray.width()) / 2), 0);
+    std::borrow::Cow::Owned(out)
+}
 
 /// Hauteur des bandes envoyées en `GS v 0`, pour ne pas saturer le tampon de l'imprimante.
 const STRIP_HEIGHT: u32 = 256;
@@ -123,10 +149,12 @@ pub fn load(path: &Path, dither: Dither) -> Result<GrayImage> {
 
 /// Envoie une image déjà préparée (largeur `PRINT_WIDTH`), découpée en bandes raster.
 pub fn print_gray<D: Driver>(printer: &mut Printer<D>, gray: &GrayImage) -> Result<()> {
+    let gray = fit_paper(gray);
+    let width = gray.width();
     let mut y = 0;
     while y < gray.height() {
         let h = STRIP_HEIGHT.min(gray.height() - y);
-        let strip = imageops::crop_imm(gray, 0, y, PRINT_WIDTH, h).to_image();
+        let strip = imageops::crop_imm(&*gray, 0, y, width, h).to_image();
         let mut png = Vec::new();
         DynamicImage::ImageLuma8(strip).write_to(&mut Cursor::new(&mut png), ImageFormat::Png)?;
         // BitImageOption n'est pas Clone : on en recrée une par bande.

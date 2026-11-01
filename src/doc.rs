@@ -10,9 +10,14 @@ use serde::Deserialize;
 
 use crate::{cp858, raster};
 
-/// Colonnes en police A (12 points) et B (9 points) sur 512 points.
-const COLUMNS_A: usize = 42;
-const COLUMNS_B: usize = 56;
+/// Colonnes en police A (12 points) et B (9 points) : 42 et 56 sur 512 points (TM-T88V),
+/// 48 et 64 sur 576 (`PRINTR_PAPER_DOTS`).
+pub fn columns_a() -> usize {
+    raster::paper_dots() as usize / 12
+}
+fn columns_b() -> usize {
+    raster::paper_dots() as usize / 9
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -79,7 +84,7 @@ impl Style {
 
     /// Nombre de caractères par ligne dans ce style.
     pub fn columns(&self) -> usize {
-        let base = if self.small { COLUMNS_B } else { COLUMNS_A };
+        let base = if self.small { columns_b() } else { columns_a() };
         (base / self.size as usize).max(1)
     }
 }
@@ -260,9 +265,9 @@ impl Doc {
     /// (à afficher via `anstream`, qui les retire hors terminal).
     pub fn preview_styled(&self, cut: bool) -> String {
         let frame = anstyle::Style::new().dimmed();
-        let top = format!("{frame}╭{}╮{frame:#}\n", "─".repeat(PAPER + 2));
-        let side = (PAPER - 1) / 2;
-        let cut_edge = format!("{frame}╰{} ✂ {}╯{frame:#}\n", "╌".repeat(side), "╌".repeat(PAPER - 1 - side));
+        let top = format!("{frame}╭{}╮{frame:#}\n", "─".repeat(paper() + 2));
+        let side = (paper() - 1) / 2;
+        let cut_edge = format!("{frame}╰{} ✂ {}╯{frame:#}\n", "╌".repeat(side), "╌".repeat(paper() - 1 - side));
         let mut out = top.clone();
         // Après une coupe, le morceau suivant ne s'ouvre qu'à la ligne d'après : une coupe
         // finale ferme le ticket sans en ouvrir un vide.
@@ -271,7 +276,7 @@ impl Doc {
             if !open.replace(true) {
                 out.push_str(&top);
             }
-            let fill = " ".repeat(PAPER.saturating_sub(visible));
+            let fill = " ".repeat(paper().saturating_sub(visible));
             out.push_str(&format!("{frame}│{frame:#} {content}{fill} {frame}│{frame:#}\n"));
         };
         for op in &self.ops {
@@ -282,14 +287,14 @@ impl Doc {
                 }
                 Op::Image(img) => {
                     for row in image_preview(img) {
-                        push(&mut out, row, PAPER);
+                        push(&mut out, row, paper());
                     }
                 }
                 Op::Qr { data, .. } => {
                     let label = tr!("▣ QR : {data}", "▣ QR: {data}");
-                    let label: String = label.chars().take(PAPER).collect();
+                    let label: String = label.chars().take(paper()).collect();
                     let len = label.chars().count();
-                    let pad = (PAPER - len) / 2;
+                    let pad = (paper() - len) / 2;
                     let dim = anstyle::Style::new().dimmed();
                     push(&mut out, format!("{}{dim}{label}{dim:#}", " ".repeat(pad)), pad + len);
                 }
@@ -304,7 +309,7 @@ impl Doc {
             if cut {
                 out.push_str(&cut_edge);
             } else {
-                out.push_str(&format!("{frame}╰{}╯{frame:#}\n", "─".repeat(PAPER + 2)));
+                out.push_str(&format!("{frame}╰{}╯{frame:#}\n", "─".repeat(paper() + 2)));
             }
         }
         out
@@ -342,13 +347,13 @@ impl Doc {
                     "align": match style.align { Align::Left => "left", Align::Center => "center", Align::Right => "right" },
                     "flip": style.upside_down,
                 })),
-                Op::Image(img) => png(img),
+                Op::Image(img) => png(&raster::fit_paper(img)),
                 Op::Qr { data, .. } => crate::draw::qr_row(&[data.as_str()]).ok().and_then(|img| png(&img)),
                 Op::Feed(n) => Some(serde_json::json!({ "t": "feed", "n": n })),
                 Op::Cut => Some(serde_json::json!({ "t": "cut" })),
             })
             .collect();
-        serde_json::json!({ "ops": ops, "height_dots": self.height_dots() })
+        serde_json::json!({ "ops": ops, "height_dots": self.height_dots(), "columns": columns_a() })
     }
 
     /// Aperçu sans couleurs (réponses HTTP, tests).
@@ -358,7 +363,9 @@ impl Doc {
 }
 
 /// Largeur de l'aperçu : celle de la police B, la plus étroite.
-const PAPER: usize = COLUMNS_B;
+fn paper() -> usize {
+    columns_b()
+}
 
 /// Nombre de modules d'un QR code (niveau M) selon la longueur des données.
 fn qr_modules(len: usize) -> u32 {
@@ -381,8 +388,8 @@ fn styled_line(text: &str, style: &Style) -> (String, usize) {
     } else {
         text.to_owned()
     };
-    let width = if style.small { COLUMNS_B } else { COLUMNS_A };
-    let margin = (PAPER - width) / 2;
+    let width = if style.small { columns_b() } else { columns_a() };
+    let margin = (paper() - width) / 2;
     let len = shown.chars().count().min(width);
     let shown: String = shown.chars().take(len).collect();
     let pad = match style.align {
@@ -411,12 +418,14 @@ fn styled_line(text: &str, style: &Style) -> (String, usize) {
 }
 
 /// Largeur occupée par une ligne de texte, en points (identique en police A et B).
-const TEXT_WIDTH: u32 = COLUMNS_A as u32 * 12;
+fn text_width() -> u32 {
+    columns_a() as u32 * 12
+}
 
 /// `GS L` + `GS W` : zone d'impression centrée de `TEXT_WIDTH` points, ou toute la largeur.
 fn set_print_area<D: Driver>(printer: &mut Printer<D>, text: bool) -> Result<()> {
     let (left, width) =
-        if text { ((raster::PRINT_WIDTH - TEXT_WIDTH) / 2, TEXT_WIDTH) } else { (0, raster::PRINT_WIDTH) };
+        if text { ((raster::paper_dots() - text_width()) / 2, text_width()) } else { (0, raster::paper_dots()) };
     let [l0, l1, ..] = left.to_le_bytes();
     let [w0, w1, ..] = width.to_le_bytes();
     printer.custom(&[0x1d, b'L', l0, l1, 0x1d, b'W', w0, w1])?;
@@ -477,7 +486,7 @@ pub fn wrap(text: &str, width: usize) -> Vec<String> {
 /// Rendu d'une image en demi-blocs, sur la largeur de l'aperçu.
 fn image_preview(img: &GrayImage) -> Vec<String> {
     let (w, h) = img.dimensions();
-    let step = w as f64 / PAPER as f64; // points par colonne, et par demi-ligne
+    let step = w as f64 / paper() as f64; // points par colonne, et par demi-ligne
     let dark = |col: usize, half_row: usize| {
         let (x0, y0) = ((col as f64 * step) as u32, (half_row as f64 * step) as u32);
         let (x1, y1) = (((col + 1) as f64 * step) as u32, ((half_row + 1) as f64 * step) as u32);
@@ -494,7 +503,7 @@ fn image_preview(img: &GrayImage) -> Vec<String> {
     let rows = (h as f64 / (2.0 * step)).ceil() as usize;
     (0..rows)
         .map(|r| {
-            (0..PAPER)
+            (0..paper())
                 .map(|c| match (dark(c, 2 * r), dark(c, 2 * r + 1)) {
                     (true, true) => '█',
                     (true, false) => '▀',
@@ -533,7 +542,7 @@ mod tests {
         assert!(texts[1].starts_with("    mot"));
         assert!(texts.iter().all(|l| l.chars().count() <= 42));
         let preview = doc.preview(true);
-        assert!(preview.lines().all(|l| l.chars().count() == PAPER + 4));
+        assert!(preview.lines().all(|l| l.chars().count() == paper() + 4));
     }
 
     #[test]
