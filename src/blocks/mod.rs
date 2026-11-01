@@ -20,6 +20,7 @@ mod hashi;
 mod holidays;
 mod horoscope;
 mod kakuro;
+mod lojong;
 mod maze;
 mod mental_math;
 mod monthly;
@@ -326,6 +327,19 @@ pub enum Block {
         cow: bool,
         #[serde(default)]
         seed: Option<u64>,
+    },
+    /// One of the 59 Lojong mind-training slogans, its explanation and its point (of seven).
+    Lojong {
+        /// 1 to 59: always this slogan.
+        #[serde(default)]
+        number: Option<u8>,
+        /// Same slogan all day, a new one each day.
+        #[serde(default)]
+        daily: bool,
+        #[serde(default)]
+        seed: Option<u64>,
+        #[serde(default = "yes")]
+        explanation: bool,
     },
     Crypto {
         #[serde(default = "default_coins")]
@@ -783,6 +797,7 @@ impl Block {
             Block::AirQuality { .. } => i18n::t("qualité de l'air", "air quality"),
             Block::Quote {} => i18n::t("citation", "quote"),
             Block::Fortune { .. } => "fortune",
+            Block::Lojong { .. } => "lojong",
             Block::Crypto { .. } => "crypto",
             Block::Sun { .. } => i18n::t("lever/coucher du soleil", "sunrise/sunset"),
             Block::Riddle { .. } => i18n::t("énigme", "riddle"),
@@ -1005,6 +1020,9 @@ impl Block {
             }
             Block::Quote {} => doc = quote::build(ctx.today),
             Block::Fortune { source, cow, seed } => doc = fortune::build(*source, *cow, *seed)?,
+            Block::Lojong { number, daily, seed, explanation } => {
+                doc = lojong::build(ctx.today, *number, *daily, *seed, *explanation)?
+            }
             Block::Crypto { coins, currency } => doc = crypto::build(&ctx.http, coins, currency)?,
             Block::Sun { location } => doc = sun::build(ctx, &place(location)?)?,
             Block::Riddle { kind, number, answer } => doc = riddle::build(ctx.today, *kind, *number, *answer)?,

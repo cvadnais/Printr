@@ -361,6 +361,16 @@ const BLOCKS = [
     ],
     summary: (b) => (b.cow ? T('Dit par une vache', 'Said by a cow') : T('Au hasard', 'Random')),
   },
+  {
+    type: 'lojong', label: 'Lojong', emoji: '🪷', group: G.daily, desc: T('Un des 59 slogans d’entraînement de l’esprit, expliqué', 'One of the 59 mind-training slogans, explained'),
+    defaults: { daily: false, explanation: true },
+    fields: [
+      { key: 'daily', label: T('Le même toute la journée', 'Same slogan all day'), kind: 'toggle' },
+      { key: 'explanation', label: T('Avec l’explication', 'With the explanation'), kind: 'toggle' },
+      { key: 'number', label: T('Slogan n°', 'Slogan No.'), kind: 'number', optional: true, help: T('1 à 59. Laisse vide pour un slogan au hasard.', '1 to 59. Leave empty for a random slogan.') },
+    ],
+    summary: (b) => (b.number ? `#${b.number}` : b.daily ? T('Du jour', 'Daily') : T('Au hasard', 'Random')),
+  },
   { type: 'moon', label: T('Lune', 'Moon'), emoji: '🌙', group: G.daily, desc: T('Phase et prochaines lunes', 'Phase and upcoming moons'), defaults: {}, fields: [] },
   {
     type: 'sun', label: T('Soleil', 'Sun'), emoji: '🌅', group: G.daily, desc: T('Lever, coucher, durée du jour', 'Sunrise, sunset, length of day'),
@@ -1535,6 +1545,7 @@ const exampleUrl = (type) => EXAMPLE[type] && `/exemples/${EN ? 'en/' : ''}${EXA
 
 // Mots-clés de recherche, dans les deux langues, en plus du nom et de la description.
 const KEYWORDS = {
+  lojong: 'lojong bouddhisme buddhism buddhist meditation slogan atisha esprit mind training tonglen',
   fortune: 'fortune cowsay vache cow biscuit cookie chinois proverbe proverb maxime blague joke hasard random',
   hashi: 'hashi ponts bridges iles islands relier connect logique logic casse-tete puzzle',
   takuzu: 'takuzu binairo binaire binary 0 1 zero un one grille grid logique logic casse-tete puzzle',
@@ -1573,7 +1584,7 @@ const TOGETHER = ['riddle', 'workout', 'petit_bac', 'anagram'];
 const OFFLINE = [
   'title', 'text', 'date', 'separator', 'feed', 'image', 'qr', 'picto', 'barnum', 'saint', 'quote', 'moon', 'holidays', 'countdown',
   'riddle', 'workout', 'sudoku', 'word_search', 'train_tracks', 'maze', 'nonogram', 'petit_bac', 'mental_math', 'anagram', 'cipher',
-  'coloring', 'coupon', 'todo', 'shopping', 'bins', 'wifi', 'monthly_report', 'chores', 'birthdays', 'kakuro', 'takuzu', 'hashi', 'fortune',
+  'coloring', 'coupon', 'todo', 'shopping', 'bins', 'wifi', 'monthly_report', 'chores', 'birthdays', 'kakuro', 'takuzu', 'hashi', 'fortune', 'lojong',
 ];
 const FILTERS = [
   { id: 'kids', emoji: '🧒', label: T('Pour les enfants', 'For kids'), words: 'enfants enfant kids children', test: (b) => KIDS.includes(b.type) },
